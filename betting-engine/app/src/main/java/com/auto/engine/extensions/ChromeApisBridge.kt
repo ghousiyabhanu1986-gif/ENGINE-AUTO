@@ -231,37 +231,67 @@ class ChromeApisBridge(
   // Automation Helper
   window.chrome.automation = {
     click: function(x, y) { bridge.automationClick(x, y); },
-    dispatchClick: function(element) {
+    dispatchClick: async function(element) {
       if (!element) return;
-      // Trigger multiple events to bypass ghost touch detection
-      ['mousedown', 'mouseup', 'click'].forEach(type => {
-        var evt = new MouseEvent(type, { 
-          bubbles: true, 
-          cancelable: true, 
-          view: window,
-          buttons: 1
-        });
-        element.dispatchEvent(evt);
-      });
-      // Also try focusing the element
-      if (element.focus) element.focus();
-    },
-    touch: function(element) {
-      if (!element) return;
-      ['touchstart', 'touchend'].forEach(type => {
-        var evt = new TouchEvent(type, {
+      
+      const rect = element.getBoundingClientRect();
+      const x = rect.left + rect.width / 2 + (Math.random() * 4 - 2);
+      const y = rect.top + rect.height / 2 + (Math.random() * 4 - 2);
+
+      const trigger = (type, extra = {}) => {
+        const evt = new MouseEvent(type, {
           bubbles: true,
           cancelable: true,
           view: window,
-          touches: [new Touch({
-            identifier: Date.now(),
-            target: element,
-            clientX: element.getBoundingClientRect().left + 5,
-            clientY: element.getBoundingClientRect().top + 5
-          })]
+          clientX: x,
+          clientY: y,
+          buttons: 1,
+          ...extra
         });
         element.dispatchEvent(evt);
-      });
+      };
+
+      trigger('mousedown');
+      await new Promise(r => setTimeout(r, 30 + Math.random() * 50));
+      trigger('mouseup');
+      trigger('click');
+      
+      if (element.focus) element.focus();
+    },
+    touch: async function(element) {
+      if (!element) return;
+      
+      const rect = element.getBoundingClientRect();
+      const x = rect.left + rect.width / 2 + (Math.random() * 4 - 2);
+      const y = rect.top + rect.height / 2 + (Math.random() * 4 - 2);
+
+      const triggerTouch = (type) => {
+        const t = new Touch({
+          identifier: Date.now(),
+          target: element,
+          clientX: x,
+          clientY: y,
+          screenX: x,
+          screenY: y,
+          pageX: x,
+          pageY: y
+        });
+        const evt = new TouchEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          touches: [t],
+          targetTouches: [t],
+          changedTouches: [t]
+        });
+        element.dispatchEvent(evt);
+      };
+
+      triggerTouch('touchstart');
+      await new Promise(r => setTimeout(r, 50 + Math.random() * 100));
+      triggerTouch('touchend');
+      
+      // Follow up with mouse events as real browsers do
       this.dispatchClick(element);
     }
   };
@@ -333,7 +363,34 @@ class ChromeApisBridge(
     onHeadersReceived: { addListener: function(){} }
   };
   
-  console.log('[BettingEngine] Chrome Extension APIs initialized');
+  // Stealth Overrides
+  const stealth = () => {
+    // Override navigator.webdriver
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    
+    // Override Languages
+    Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+    
+    // Override Plugins
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+    
+    // Override Chrome object
+    window.chrome = window.chrome || {};
+    if (!window.chrome.app) {
+        window.chrome.app = { InstallState: "IDLE", RunningState: "CANNOT_RUN", getDetails: () => {}, getIsInstalled: () => false };
+    }
+    
+    // Fix permissions
+    const originalQuery = window.navigator.permissions.query;
+    window.navigator.permissions.query = (parameters) => (
+      parameters.name === 'notifications' ?
+        Promise.resolve({ state: Notification.permission }) :
+        originalQuery(parameters)
+    );
+  };
+  stealth();
+
+  console.log('[BettingEngine] Chrome Extension APIs and Stealth initialized');
 })();
         """.trimIndent()
     }
