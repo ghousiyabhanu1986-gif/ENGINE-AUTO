@@ -133,17 +133,15 @@ class ExtensionManager(private val context: Context) {
     fun injectExtensions(webView: WebView) {
         val webViewId = System.identityHashCode(webView)
 
-        // Inject Chrome API bootstrap only once per WebView
-        if (bootstrappedWebViews.add(webViewId)) {
-            webView.evaluateJavascript(ChromeApisBridge.BOOTSTRAP_JS, null)
-        }
+        // Always inject bootstrap to ensure it's present after refresh
+        webView.evaluateJavascript(ChromeApisBridge.BOOTSTRAP_JS, null)
 
         val extensions = getAll().filter { it.enabled }
         // Get or create the injected set for this WebView
         val injected = injectedExtensions.getOrPut(webViewId) { mutableSetOf() }
 
         for (ext in extensions) {
-            // Skip extensions already injected into this WebView
+            // Skip extensions already injected into this WebView to avoid duplicates on same page
             if (ext.id in injected) continue
             injected.add(ext.id)
 
@@ -157,8 +155,9 @@ class ExtensionManager(private val context: Context) {
                         val js = """
                             (function(){
                                 var s=document.createElement('style');
+                                s.id='ext-style-${ext.id}';
                                 s.textContent=`$css`;
-                                document.head.appendChild(s);
+                                if (!document.getElementById(s.id)) document.head.appendChild(s);
                             })();
                         """.trimIndent()
                         webView.evaluateJavascript(js, null)
@@ -169,7 +168,17 @@ class ExtensionManager(private val context: Context) {
                     val f = findExtensionFile(extDir, jsFile)
                     if (f != null && f.exists()) {
                         val code = f.readText()
-                        webView.evaluateJavascript(code, null)
+                        // Wrap in a closure to avoid global scope pollution and ensure clean injection
+                        val wrappedCode = """
+                            (function() {
+                                try {
+                                    $code
+                                } catch (e) {
+                                    console.error('Error in extension ${ext.id}:', e);
+                                }
+                            })();
+                        """.trimIndent()
+                        webView.evaluateJavascript(wrappedCode, null)
                     }
                 }
             }

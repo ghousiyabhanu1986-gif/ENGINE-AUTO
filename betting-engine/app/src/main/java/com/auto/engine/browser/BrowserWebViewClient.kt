@@ -45,6 +45,9 @@ class BrowserWebViewClient(
         if (url.startsWith("intent://") || url.startsWith("market://")) {
             return true // block non-http schemes
         }
+        if (url.startsWith(EXTENSION_SCHEME)) {
+            return false // Allow extension scheme
+        }
         return false
     }
 

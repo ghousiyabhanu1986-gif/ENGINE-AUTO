@@ -110,13 +110,14 @@ class BrowserActivity : AppCompatActivity() {
         applyWebViewSettings(webView, tab.isIncognito)
         webView.webViewClient = BrowserWebViewClient(
             context = this,
-            onPageStarted = { url ->
-                updateAddressBar(url)
-                binding.progressBar.isVisible = true
-                tab.isLoading = true
-                tab.url = url
-                updateNavButtons(webView)
-            },
+	            onPageStarted = { url ->
+	                updateAddressBar(url)
+	                binding.progressBar.isVisible = true
+	                tab.isLoading = true
+	                tab.url = url
+	                updateNavButtons(webView)
+	                extensionManager.resetInjectionState(webView)
+	            },
             onPageFinished = { url, title ->
                 binding.progressBar.isVisible = false
                 tab.isLoading = false

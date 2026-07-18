@@ -121,9 +121,13 @@ class ChromeApisBridge(
 
     @JavascriptInterface
     fun automationClick(x: Int, y: Int) {
-        // This is a custom API for "ghost touch" automation
-        // It can be called from JS: window.AndroidBridge.automationClick(x, y)
-        // Implementation would ideally use Instrumentation or MotionEvent
+        // Use a more robust way to simulate clicks if possible, or provide better JS feedback
+        // For now, we'll ensure the JS helper is as strong as possible
+    }
+
+    @JavascriptInterface
+    fun logExtension(message: String) {
+        android.util.Log.d("ExtensionLog", message)
     }
 
     @JavascriptInterface
@@ -229,8 +233,36 @@ class ChromeApisBridge(
     click: function(x, y) { bridge.automationClick(x, y); },
     dispatchClick: function(element) {
       if (!element) return;
-      var evt = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
-      element.dispatchEvent(evt);
+      // Trigger multiple events to bypass ghost touch detection
+      ['mousedown', 'mouseup', 'click'].forEach(type => {
+        var evt = new MouseEvent(type, { 
+          bubbles: true, 
+          cancelable: true, 
+          view: window,
+          buttons: 1
+        });
+        element.dispatchEvent(evt);
+      });
+      // Also try focusing the element
+      if (element.focus) element.focus();
+    },
+    touch: function(element) {
+      if (!element) return;
+      ['touchstart', 'touchend'].forEach(type => {
+        var evt = new TouchEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          touches: [new Touch({
+            identifier: Date.now(),
+            target: element,
+            clientX: element.getBoundingClientRect().left + 5,
+            clientY: element.getBoundingClientRect().top + 5
+          })]
+        });
+        element.dispatchEvent(evt);
+      });
+      this.dispatchClick(element);
     }
   };
   
