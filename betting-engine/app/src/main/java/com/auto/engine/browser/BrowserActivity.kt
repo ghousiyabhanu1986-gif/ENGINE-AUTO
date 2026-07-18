@@ -189,6 +189,7 @@ class BrowserActivity : AppCompatActivity() {
         }
         // Inject Chrome Extension APIs bridge
         val bridge = ChromeApisBridge(this, isIncognito)
+        bridge.setWebView(webView)
         webView.addJavascriptInterface(bridge, "AndroidBridge")
 
         if (isIncognito) {

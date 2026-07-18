@@ -15,6 +15,11 @@ class ChromeApisBridge(
     private val context: Context,
     private val isIncognito: Boolean
 ) {
+    private var webView: WebView? = null
+
+    fun setWebView(wv: WebView) {
+        this.webView = wv
+    }
     private val gson = Gson()
     private val storage = context.getSharedPreferences("ext_storage", Context.MODE_PRIVATE)
     private val syncStorage = context.getSharedPreferences("ext_storage_sync", Context.MODE_PRIVATE)
@@ -121,8 +126,28 @@ class ChromeApisBridge(
 
     @JavascriptInterface
     fun automationClick(x: Int, y: Int) {
-        // Use a more robust way to simulate clicks if possible, or provide better JS feedback
-        // For now, we'll ensure the JS helper is as strong as possible
+        webView?.post {
+            val downTime = android.os.SystemClock.uptimeMillis()
+            val eventTime = android.os.SystemClock.uptimeMillis()
+            
+            // Down event
+            val downEvent = android.view.MotionEvent.obtain(
+                downTime, eventTime, android.view.MotionEvent.ACTION_DOWN,
+                x.toFloat(), y.toFloat(), 0
+            )
+            webView?.dispatchTouchEvent(downEvent)
+            downEvent.recycle()
+
+            // Up event after a small delay
+            webView?.postDelayed({
+                val upEvent = android.view.MotionEvent.obtain(
+                    downTime, android.os.SystemClock.uptimeMillis(),
+                    android.view.MotionEvent.ACTION_UP, x.toFloat(), y.toFloat(), 0
+                )
+                webView?.dispatchTouchEvent(upEvent)
+                upEvent.recycle()
+            }, 50)
+        }
     }
 
     @JavascriptInterface
@@ -230,68 +255,17 @@ class ChromeApisBridge(
 
   // Automation Helper
   window.chrome.automation = {
-    click: function(x, y) { bridge.automationClick(x, y); },
+    click: function(x, y) { bridge.automationClick(Math.round(x), Math.round(y)); },
     dispatchClick: async function(element) {
       if (!element) return;
-      
       const rect = element.getBoundingClientRect();
-      const x = rect.left + rect.width / 2 + (Math.random() * 4 - 2);
-      const y = rect.top + rect.height / 2 + (Math.random() * 4 - 2);
-
-      const trigger = (type, extra = {}) => {
-        const evt = new MouseEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-          clientX: x,
-          clientY: y,
-          buttons: 1,
-          ...extra
-        });
-        element.dispatchEvent(evt);
-      };
-
-      trigger('mousedown');
-      await new Promise(r => setTimeout(r, 30 + Math.random() * 50));
-      trigger('mouseup');
-      trigger('click');
-      
-      if (element.focus) element.focus();
+      // Calculate absolute screen coordinates for the native touch
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      this.click(x, y);
     },
     touch: async function(element) {
       if (!element) return;
-      
-      const rect = element.getBoundingClientRect();
-      const x = rect.left + rect.width / 2 + (Math.random() * 4 - 2);
-      const y = rect.top + rect.height / 2 + (Math.random() * 4 - 2);
-
-      const triggerTouch = (type) => {
-        const t = new Touch({
-          identifier: Date.now(),
-          target: element,
-          clientX: x,
-          clientY: y,
-          screenX: x,
-          screenY: y,
-          pageX: x,
-          pageY: y
-        });
-        const evt = new TouchEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          view: window,
-          touches: [t],
-          targetTouches: [t],
-          changedTouches: [t]
-        });
-        element.dispatchEvent(evt);
-      };
-
-      triggerTouch('touchstart');
-      await new Promise(r => setTimeout(r, 50 + Math.random() * 100));
-      triggerTouch('touchend');
-      
-      // Follow up with mouse events as real browsers do
       this.dispatchClick(element);
     }
   };
