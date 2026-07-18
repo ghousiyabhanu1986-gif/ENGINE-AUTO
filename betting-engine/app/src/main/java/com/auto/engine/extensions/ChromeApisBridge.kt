@@ -127,22 +127,25 @@ class ChromeApisBridge(
     @JavascriptInterface
     fun automationClick(x: Int, y: Int) {
         webView?.post {
+            // Coordinate scaling for screen density
+            val density = context.resources.displayMetrics.density
+            val scaledX = x * density
+            val scaledY = y * density
+            
             val downTime = android.os.SystemClock.uptimeMillis()
             val eventTime = android.os.SystemClock.uptimeMillis()
             
-            // Down event
             val downEvent = android.view.MotionEvent.obtain(
                 downTime, eventTime, android.view.MotionEvent.ACTION_DOWN,
-                x.toFloat(), y.toFloat(), 0
+                scaledX, scaledY, 0
             )
             webView?.dispatchTouchEvent(downEvent)
             downEvent.recycle()
 
-            // Up event after a small delay
             webView?.postDelayed({
                 val upEvent = android.view.MotionEvent.obtain(
                     downTime, android.os.SystemClock.uptimeMillis(),
-                    android.view.MotionEvent.ACTION_UP, x.toFloat(), y.toFloat(), 0
+                    android.view.MotionEvent.ACTION_UP, scaledX, scaledY, 0
                 )
                 webView?.dispatchTouchEvent(upEvent)
                 upEvent.recycle()
@@ -255,11 +258,16 @@ class ChromeApisBridge(
 
   // Automation Helper
   window.chrome.automation = {
-    click: function(x, y) { bridge.automationClick(Math.round(x), Math.round(y)); },
+    click: function(x, y) { 
+      // Account for scroll position
+      var sx = x + window.scrollX;
+      var sy = y + window.scrollY;
+      bridge.automationClick(Math.round(sx), Math.round(sy)); 
+    },
     dispatchClick: async function(element) {
       if (!element) return;
       const rect = element.getBoundingClientRect();
-      // Calculate absolute screen coordinates for the native touch
+      // Use center of element for most reliable click
       const x = rect.left + rect.width / 2;
       const y = rect.top + rect.height / 2;
       this.click(x, y);
@@ -267,6 +275,16 @@ class ChromeApisBridge(
     touch: async function(element) {
       if (!element) return;
       this.dispatchClick(element);
+    }
+  };
+
+  // Expanded Message Handling (Kiwi-style)
+  window.chrome.runtime.onMessage = {
+    listeners: [],
+    addListener: function(fn) { this.listeners.push(fn); },
+    removeListener: function(fn) { this.listeners = this.listeners.filter(l => l !== fn); },
+    trigger: function(msg, sender, sendResponse) {
+      this.listeners.forEach(l => l(msg, sender, sendResponse));
     }
   };
   

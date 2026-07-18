@@ -117,6 +117,8 @@ class BrowserActivity : AppCompatActivity() {
 	                tab.url = url
 	                updateNavButtons(webView)
 	                extensionManager.resetInjectionState(webView)
+	                // Early injection (Kiwi-style)
+	                extensionManager.injectExtensions(webView)
 	            },
             onPageFinished = { url, title ->
                 binding.progressBar.isVisible = false
