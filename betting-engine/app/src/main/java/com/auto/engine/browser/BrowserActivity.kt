@@ -78,6 +78,9 @@ class BrowserActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityBrowserBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        
+        // Keep screen on for automation
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         tabManager = TabManager(this)
         historyManager = HistoryManager(this)
@@ -175,7 +178,7 @@ class BrowserActivity : AppCompatActivity() {
             displayZoomControls = false
             setSupportZoom(true)
             setSupportMultipleWindows(true) // Enable multiple windows for popups
-            mediaPlaybackRequiresUserGesture = false
+            mediaPlaybackRequiresUserGesture = false // Crucial for NoSleep/WakeLock scripts
             javaScriptCanOpenWindowsAutomatically = true
             loadsImagesAutomatically = true
             setGeolocationEnabled(true)

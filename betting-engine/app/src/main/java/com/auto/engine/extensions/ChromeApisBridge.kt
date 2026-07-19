@@ -355,6 +355,9 @@ class ChromeApisBridge(
     onHeadersReceived: { addListener: function(){} }
   };
   
+  // Global Variable Polyfills
+  window.SEQ_LEN = window.SEQ_LEN || 8; // Default value to prevent ReferenceError
+  
   // Stealth Overrides
   const stealth = () => {
     // Override navigator.webdriver
